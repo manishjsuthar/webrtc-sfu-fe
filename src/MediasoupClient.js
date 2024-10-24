@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { io } from "socket.io-client";
 import { Device } from "mediasoup-client";
-const socket = io("https://3.7.69.150:8000/mediasoup");
+const socket = io("https://localhost:4200/mediasoup");
 
 const MediasoupComponent = () => {
   const localVideoRef = useRef(null);
