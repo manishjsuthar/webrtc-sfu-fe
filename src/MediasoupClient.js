@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { io } from "socket.io-client";
 import { Device } from "mediasoup-client";
-const socket = io("https://localhost:4200/mediasoup");
+const socket = io("https://localhost:7100/mediasoup");
 
 const MediasoupComponent = () => {
   const localVideoRef = useRef(null);
@@ -10,6 +10,7 @@ const MediasoupComponent = () => {
   let device;
   let consumingTransports = [];
   let consumerTransports = [];
+  const [selectedProducerId, setselectedProducerId] = useState("");
 
   const getVideoParams = () => ({
     encodings: [
@@ -54,6 +55,24 @@ const MediasoupComponent = () => {
       })
       .then((stream) => streamSuccess(stream))
       .catch((error) => console.error("Error accessing media devices.", error));
+  };
+
+  const toggleAudio = () => {
+    if (localVideoRef.current) {
+      const audioTrack = localVideoRef.current.srcObject.getAudioTracks()[0];
+      if (audioTrack) {
+        audioTrack.enabled = !audioTrack.enabled;
+      }
+    }
+  };
+
+  const toggleVideo = () => {
+    if (localVideoRef.current) {
+      const videoTrack = localVideoRef.current.srcObject.getVideoTracks()[0];
+      if (videoTrack) {
+        videoTrack.enabled = !videoTrack.enabled;
+      }
+    }
   };
 
   const streamSuccess = (stream) => {
@@ -259,6 +278,7 @@ const MediasoupComponent = () => {
           // Create a new div element for the new consumer media
           const newElem = document.createElement("div");
           newElem.setAttribute("id", `td-${remoteProducerId}`);
+          console.log(params.kind, "remoteProducerId ", remoteProducerId);
 
           if (params.kind === "audio") {
             newElem.innerHTML =
@@ -310,11 +330,55 @@ const MediasoupComponent = () => {
     }
   };
 
+  const resumeProducerStream = (producerId) => {
+    if (!producerId) {
+      console.log("please provide producer id");
+      return;
+    }
+    socket.emit("resumeProducerStream", { producerId }, (response) => {
+      if (response.success) {
+        console.log("Producer stream resumed");
+        // Handle video playback, etc.
+      } else {
+        console.error("Failed to select producer stream:", response.error);
+      }
+    });
+  };
+
+  const pauseProducerStream = (producerId) => {
+    if (!producerId) {
+      console.log("please provide producer id");
+      return;
+    }
+    socket.emit("pauseProducerStream", { producerId }, (response) => {
+      if (response.success) {
+        console.log("Producer stream paused");
+        // Update UI accordingly
+      } else {
+        console.error("Failed to deselect producer stream:", response.error);
+      }
+    });
+  };
+
   return (
     <div>
       <h1>Proctoring</h1>
       <video ref={localVideoRef} id="local-video" autoPlay />
       <div ref={videoContainerRef} id="video-container" />
+
+      <button onClick={toggleAudio}>Toggle Audio</button>
+      <button onClick={toggleVideo}>Toggle Video</button>
+
+      <input
+        onChange={(e) => setselectedProducerId(e.target.value)}
+        placeholder="enter producer id"
+      />
+      <button onClick={() => resumeProducerStream(selectedProducerId)}>
+        Resume Stream
+      </button>
+      <button onClick={() => pauseProducerStream(selectedProducerId)}>
+        Pause Stream
+      </button>
     </div>
   );
 };
