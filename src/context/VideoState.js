@@ -1,24 +1,31 @@
-// TutorProctoring.js
 import React, { useEffect, useRef, useState } from "react";
 import { io } from "socket.io-client";
 import { Device } from "mediasoup-client";
-import { useParams } from "react-router-dom";
+import VideoContext from "./VideoContext";
 const socket = io("https://localhost:7100/mediasoup");
 
-const TutorProctoring = () => {
+const VideoStateProvider = ({ children }) => {
+  const localVideoRef = useRef(null);
   const videoContainerRef = useRef(null);
   // const roomName = window.location.pathname.split("/")[1];
-  // const roomName = "hello112";
-  const { roomName } = useParams();
+  const roomName = "hello112";
   let device;
   let consumingTransports = [];
   let consumerTransports = [];
-  const [socketStreamId, setsocketStreamId] = useState("");
+
+  const getVideoParams = () => ({
+    encodings: [
+      { rid: "r0", maxBitrate: 100000, scalabilityMode: "S1T3" },
+      { rid: "r1", maxBitrate: 300000, scalabilityMode: "S1T3" },
+      { rid: "r2", maxBitrate: 900000, scalabilityMode: "S1T3" },
+    ],
+    codecOptions: { videoGoogleStartBitrate: 1000 },
+  });
 
   useEffect(() => {
     const handleConnectionSuccess = ({ socketId }) => {
       console.log(socketId);
-      joinRoom();
+      getLocalStream();
     };
 
     const handleNewProducer = ({ producerId }) =>
@@ -38,24 +45,138 @@ const TutorProctoring = () => {
     };
   }, []);
 
-  const joinRoom = () => {
+  const getLocalStream = () => {
+    navigator.mediaDevices
+      .getUserMedia({
+        audio: true,
+        video: {
+          width: { min: 640, max: 1920 },
+          height: { min: 400, max: 1080 },
+        },
+      })
+      .then((stream) => streamSuccess(stream))
+      .catch((error) => console.error("Error accessing media devices.", error));
+  };
+
+  const toggleAudio = () => {
+    if (localVideoRef.current) {
+      const audioTrack = localVideoRef.current.srcObject.getAudioTracks()[0];
+      if (audioTrack) {
+        audioTrack.enabled = !audioTrack.enabled;
+      }
+    }
+  };
+
+  const toggleVideo = () => {
+    if (localVideoRef.current) {
+      const videoTrack = localVideoRef.current.srcObject.getVideoTracks()[0];
+      if (videoTrack) {
+        videoTrack.enabled = !videoTrack.enabled;
+      }
+    }
+  };
+
+  const streamSuccess = (stream) => {
+    if (localVideoRef.current) {
+      localVideoRef.current.srcObject = stream;
+    }
+    const audioParams = { track: stream.getAudioTracks()[0] };
+    const videoParams = {
+      track: stream.getVideoTracks()[0],
+      params: getVideoParams(),
+    };
+
+    joinRoom(audioParams, videoParams);
+  };
+
+  const joinRoom = (audioParams, videoParams) => {
     socket.emit("joinRoom", { roomName }, (data) => {
       console.log(`Router RTP Capabilities... ${data.rtpCapabilities}`);
-      createDevice(data.rtpCapabilities);
+      createDevice(data.rtpCapabilities, audioParams, videoParams);
     });
   };
 
-  const createDevice = async (rtpCapabilities1) => {
+  const createDevice = async (rtpCapabilities1, audioParams, videoParams) => {
     try {
       device = new Device();
       await device.load({ routerRtpCapabilities: rtpCapabilities1 });
       console.log("Device RTP Capabilities", device.rtpCapabilities);
-      getProducers();
+      createSendTransport(device, audioParams, videoParams);
     } catch (error) {
       console.error("Error creating device:", error);
       if (error.name === "UnsupportedError") {
         console.warn("Browser not supported");
       }
+    }
+  };
+
+  const createSendTransport = (device, audioParams, videoParams) => {
+    socket.emit("createWebRtcTransport", { consumer: false }, ({ params }) => {
+      if (params.error) {
+        console.error(params.error);
+        return;
+      }
+
+      const producerTransport = device.createSendTransport(params);
+
+      producerTransport.on(
+        "connect",
+        async ({ dtlsParameters }, callback, errback) => {
+          try {
+            await socket.emit("transport-connect", { dtlsParameters });
+            callback();
+          } catch (error) {
+            errback(error);
+          }
+        }
+      );
+
+      producerTransport.on("produce", async (parameters, callback, errback) => {
+        try {
+          await socket.emit(
+            "transport-produce",
+            {
+              kind: parameters.kind,
+              rtpParameters: parameters.rtpParameters,
+              appData: parameters.appData,
+            },
+            ({ id, producersExist }) => {
+              callback({ id });
+              if (producersExist) getProducers();
+            }
+          );
+        } catch (error) {
+          errback(error);
+        }
+      });
+
+      connectSendTransport(producerTransport, audioParams, videoParams);
+    });
+  };
+
+  const connectSendTransport = async (
+    producerTransport,
+    audioParams,
+    videoParams
+  ) => {
+    try {
+      const audioProducer = await producerTransport.produce(audioParams);
+      const videoProducer = await producerTransport.produce(videoParams);
+
+      // setAudioProducer(audioProducer);
+      // setVideoProducer(videoProducer);
+
+      audioProducer.on("trackended", () => console.log("Audio track ended"));
+      audioProducer.on("transportclose", () =>
+        console.log("Audio transport ended")
+      );
+
+      videoProducer.on("trackended", () => console.log("Video track ended"));
+      videoProducer.on("transportclose", () =>
+        console.log("Video transport ended")
+      );
+    } catch (error) {
+      console.error("Error connecting send transport:", error);
     }
   };
 
@@ -210,12 +331,12 @@ const TutorProctoring = () => {
     }
   };
 
-  const resumeProducerStream = (socketId, kind) => {
-    if (!socketId) {
-      console.log("please provide socket id");
+  const resumeProducerStream = (producerId) => {
+    if (!producerId) {
+      console.log("please provide producer id");
       return;
     }
-    socket.emit("resumeProducerStream", { socketId, kind }, (response) => {
+    socket.emit("resumeProducerStream", { producerId }, (response) => {
       if (response.success) {
         console.log("Producer stream resumed");
         // Handle video playback, etc.
@@ -225,12 +346,12 @@ const TutorProctoring = () => {
     });
   };
 
-  const pauseProducerStream = (socketId, kind) => {
-    if (!socketId) {
+  const pauseProducerStream = (producerId) => {
+    if (!producerId) {
       console.log("please provide producer id");
       return;
     }
-    socket.emit("pauseProducerStream", { socketId, kind }, (response) => {
+    socket.emit("pauseProducerStream", { producerId }, (response) => {
       if (response.success) {
         console.log("Producer stream paused");
         // Update UI accordingly
@@ -241,23 +362,15 @@ const TutorProctoring = () => {
   };
 
   return (
-    <div>
-      <h1>Tutor Proctoring</h1>
-      <input
-        type="text"
-        placeholder="Enter socker ID"
-        value={socketStreamId}
-        onChange={(e) => setsocketStreamId(e.target.value)}
-      />
-      <button onClick={() => resumeProducerStream(socketStreamId, "video")}>
-        Resume Stream
-      </button>
-      <button onClick={() => pauseProducerStream(socketStreamId, "video")}>
-        Pause Stream
-      </button>
-      <div ref={videoContainerRef} id="video-container" />
-    </div>
+    <VideoContext.Provider
+      value={{
+        localVideoRef,
+        videoContainerRef,
+      }}
+    >
+      {children}
+    </VideoContext.Provider>
   );
 };
 
-export default TutorProctoring;
+export default VideoStateProvider;

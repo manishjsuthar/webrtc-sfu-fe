@@ -1,16 +1,20 @@
-
 import { BrowserRouter, Routes, Route } from "react-router-dom";
-import MediasoupComponent from "./MediasoupClient";
+// import MediasoupComponent from "./MediasoupClient";
+import TutorProctoring from "./TutorProctoring";
+import StudentProctoring from "./StudentProctoring";
 
 function App() {
   return (
     <>
-    <MediasoupComponent/>
-      {/* <BrowserRouter>
-        <Routes>
-          <Route path="/sfu/:room" element={<MediasoupClient />} />
-        </Routes>
-      </BrowserRouter> */}
+      {/* <MediasoupComponent/> */}
+      {/* <VideoStateProvider> */}
+        <BrowserRouter>
+          <Routes>
+            <Route path="/st/:roomName" element={<StudentProctoring />} />
+            <Route path="/tr/:roomName" element={<TutorProctoring />} />
+          </Routes>
+        </BrowserRouter>
+      {/* </VideoStateProvider> */}
     </>
   );
 }
