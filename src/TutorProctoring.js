@@ -1,4 +1,3 @@
-// TutorProctoring.js
 import React, { useEffect, useRef, useState } from "react";
 import { io } from "socket.io-client";
 import { Device } from "mediasoup-client";
@@ -7,13 +6,11 @@ const socket = io("https://localhost:7100/mediasoup");
 
 const TutorProctoring = () => {
   const videoContainerRef = useRef(null);
-  // const roomName = window.location.pathname.split("/")[1];
-  // const roomName = "hello112";
   const { roomName } = useParams();
   let device;
   let consumingTransports = [];
   let consumerTransports = [];
-  const [socketStreamId, setsocketStreamId] = useState("");
+  const [streamProducerId, setStreamProducerId] = useState("");
 
   useEffect(() => {
     const handleConnectionSuccess = ({ socketId }) => {
@@ -21,8 +18,11 @@ const TutorProctoring = () => {
       joinRoom();
     };
 
-    const handleNewProducer = ({ producerId }) =>
+    const handleNewProducer = ({ producerId }) => {
+      console.log("t1 producerId ", producerId);
       signalNewConsumerTransport(producerId);
+    };
+
     const handleProducerClose = ({ remoteProducerId }) =>
       handleProducerClosed(remoteProducerId);
 
@@ -149,6 +149,14 @@ const TutorProctoring = () => {
             rtpParameters: params.rtpParameters,
           });
 
+          console.log("tetsttttt", {
+            consumerId: params.id,
+            producerId: params.producerId,
+            kind: params.kind,
+            rtpParameters: params.rtpParameters,
+            serverConsumerId: params.id,
+          });
+
           consumerTransports = [
             ...consumerTransports,
             {
@@ -166,13 +174,19 @@ const TutorProctoring = () => {
 
           if (params.kind === "audio") {
             newElem.innerHTML =
-              '<audio id="' + remoteProducerId + '" autoplay></audio>';
+              '<audio id="' +
+              remoteProducerId +
+              '" autoplay></audio> <p> audio"' +
+              remoteProducerId +
+              '"</>';
           } else {
             newElem.setAttribute("class", "remoteVideo");
             newElem.innerHTML =
               '<video id="' +
               remoteProducerId +
-              '" autoplay class="video"></video>';
+              '" autoplay class="video"></video> <p> video"' +
+              remoteProducerId +
+              '"</>';
           }
 
           videoContainerRef.current.appendChild(newElem);
@@ -214,12 +228,12 @@ const TutorProctoring = () => {
     }
   };
 
-  const resumeProducerStream = (socketId, kind) => {
-    if (!socketId) {
-      console.log("please provide socket id");
+  const resumeProducerStream = (producerId) => {
+    if (!producerId) {
+      console.log("please provide producer id");
       return;
     }
-    socket.emit("resumeProducerStream", { socketId, kind }, (response) => {
+    socket.emit("resumeProducerStream", { producerId }, (response) => {
       if (response.success) {
         console.log("Producer stream resumed");
         // Handle video playback, etc.
@@ -229,12 +243,13 @@ const TutorProctoring = () => {
     });
   };
 
-  const pauseProducerStream = (socketId, kind) => {
-    if (!socketId) {
+  const pauseProducerStream = (producerId) => {
+    if (!producerId) {
       console.log("please provide producer id");
       return;
     }
-    socket.emit("pauseProducerStream", { socketId, kind }, (response) => {
+
+    socket.emit("pauseProducerStream", { producerId }, (response) => {
       if (response.success) {
         console.log("Producer stream paused");
         // Update UI accordingly
@@ -249,14 +264,14 @@ const TutorProctoring = () => {
       <h1>Tutor Proctoring</h1>
       <input
         type="text"
-        placeholder="Enter socker ID"
-        value={socketStreamId}
-        onChange={(e) => setsocketStreamId(e.target.value)}
+        placeholder="Enter producer ID"
+        value={streamProducerId}
+        onChange={(e) => setStreamProducerId(e.target.value)}
       />
-      <button onClick={() => resumeProducerStream(socketStreamId, "video")}>
+      <button onClick={() => resumeProducerStream(streamProducerId)}>
         Resume Stream
       </button>
-      <button onClick={() => pauseProducerStream(socketStreamId, "video")}>
+      <button onClick={() => pauseProducerStream(streamProducerId)}>
         Pause Stream
       </button>
       <div ref={videoContainerRef} id="video-container" />

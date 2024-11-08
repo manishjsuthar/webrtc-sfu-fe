@@ -1,4 +1,3 @@
-// StudentProctoring.js
 import React, { useEffect, useRef, useState } from "react";
 import { io } from "socket.io-client";
 import { Device } from "mediasoup-client";
@@ -7,9 +6,8 @@ const socket = io("https://localhost:7100/mediasoup");
 
 const StudentProctoring = () => {
   const localVideoRef = useRef(null);
-  // const roomName = window.location.pathname.split("/")[1];
-  // const roomName = "hello112";
   const { roomName } = useParams();
+  const [username, setusername] = useState("");
   let device;
 
   const getVideoParams = () => ({
@@ -24,7 +22,7 @@ const StudentProctoring = () => {
   useEffect(() => {
     const handleConnectionSuccess = ({ socketId }) => {
       console.log(socketId);
-      getLocalStream();
+      // getLocalStream();
     };
 
     socket.on("connection-success", handleConnectionSuccess);
@@ -35,7 +33,7 @@ const StudentProctoring = () => {
     };
   }, []);
 
-  const getLocalStream = () => {
+  const getLocalStream = (userId) => {
     navigator.mediaDevices
       .getUserMedia({
         audio: true,
@@ -44,11 +42,11 @@ const StudentProctoring = () => {
           height: { min: 400, max: 1080 },
         },
       })
-      .then((stream) => streamSuccess(stream))
+      .then((stream) => streamSuccess(stream, userId))
       .catch((error) => console.error("Error accessing media devices.", error));
   };
 
-  const streamSuccess = (stream) => {
+  const streamSuccess = (stream, userId) => {
     if (localVideoRef.current) {
       localVideoRef.current.srcObject = stream;
     }
@@ -58,13 +56,13 @@ const StudentProctoring = () => {
       params: getVideoParams(),
     };
 
-    joinRoom(audioParams, videoParams);
+    joinRoom(audioParams, videoParams, userId);
   };
 
-  const joinRoom = (audioParams, videoParams) => {
+  const joinRoom = (audioParams, videoParams, userId) => {
     socket.emit(
       "joinRoom",
-      { roomName, role: "student", name: "test", id: 12 },
+      { roomName, role: "student", name: "test", id: userId },
       (data) => {
         console.log(`Router RTP Capabilities... ${data.rtpCapabilities}`);
         createDevice(data.rtpCapabilities, audioParams, videoParams);
@@ -139,9 +137,6 @@ const StudentProctoring = () => {
       const audioProducer = await producerTransport.produce(audioParams);
       const videoProducer = await producerTransport.produce(videoParams);
 
-      // setAudioProducer(audioProducer);
-      // setVideoProducer(videoProducer);
-
       audioProducer.on("trackended", () => console.log("Audio track ended"));
       audioProducer.on("transportclose", () =>
         console.log("Audio transport ended")
@@ -159,13 +154,21 @@ const StudentProctoring = () => {
   return (
     <div>
       <h1>Student Proctoring</h1>
-      {/* <input
+      <input
         type="text"
-        placeholder="Enter Room ID"
-        value={roomName}
-        onChange={(e) => setroomName(e.target.value)}
+        placeholder="Enter User ID"
+        value={username}
+        onChange={(e) => setusername(e.target.value)}
       />
-      <button onClick={joinRoom}>Join Room</button> */}
+      <button
+        onClick={() => {
+          username.length
+            ? getLocalStream(username)
+            : alert("Userid is required");
+        }}
+      >
+        Join Room
+      </button>
       <video ref={localVideoRef} id="local-video" autoPlay muted />
     </div>
   );
