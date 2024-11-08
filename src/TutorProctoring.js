@@ -39,10 +39,14 @@ const TutorProctoring = () => {
   }, []);
 
   const joinRoom = () => {
-    socket.emit("joinRoom", { roomName }, (data) => {
-      console.log(`Router RTP Capabilities... ${data.rtpCapabilities}`);
-      createDevice(data.rtpCapabilities);
-    });
+    socket.emit(
+      "joinRoom",
+      { roomName, role: "teacher", name: "admin test", id: 11 },
+      (data) => {
+        console.log(`Router RTP Capabilities... ${data.rtpCapabilities}`);
+        createDevice(data.rtpCapabilities);
+      }
+    );
   };
 
   const createDevice = async (rtpCapabilities1) => {

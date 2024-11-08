@@ -62,10 +62,14 @@ const StudentProctoring = () => {
   };
 
   const joinRoom = (audioParams, videoParams) => {
-    socket.emit("joinRoom", { roomName }, (data) => {
-      console.log(`Router RTP Capabilities... ${data.rtpCapabilities}`);
-      createDevice(data.rtpCapabilities, audioParams, videoParams);
-    });
+    socket.emit(
+      "joinRoom",
+      { roomName, role: "student", name: "test", id: 12 },
+      (data) => {
+        console.log(`Router RTP Capabilities... ${data.rtpCapabilities}`);
+        createDevice(data.rtpCapabilities, audioParams, videoParams);
+      }
+    );
   };
 
   const createDevice = async (rtpCapabilities1, audioParams, videoParams) => {
