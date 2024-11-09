@@ -18,9 +18,8 @@ const TutorProctoring = () => {
       joinRoom();
     };
 
-    const handleNewProducer = ({ producerId }) => {
-      console.log("t1 producerId ", producerId);
-      signalNewConsumerTransport(producerId);
+    const handleNewProducer = ({ producerId, producerUserId }) => {
+      signalNewConsumerTransport(producerId, producerUserId);
     };
 
     const handleProducerClose = ({ remoteProducerId }) =>
@@ -63,7 +62,10 @@ const TutorProctoring = () => {
     }
   };
 
-  const signalNewConsumerTransport = async (remoteProducerId) => {
+  const signalNewConsumerTransport = async (
+    remoteProducerId,
+    remoteProducerUserId
+  ) => {
     if (consumingTransports.includes(remoteProducerId)) return;
     consumingTransports.push(remoteProducerId);
 
@@ -108,7 +110,12 @@ const TutorProctoring = () => {
             }
           );
 
-          connectRecvTransport(consumerTransport, remoteProducerId, params.id);
+          connectRecvTransport(
+            consumerTransport,
+            remoteProducerId,
+            params.id,
+            remoteProducerUserId
+          );
         }
       );
     } catch (error) {
@@ -118,15 +125,17 @@ const TutorProctoring = () => {
 
   const getProducers = () => {
     socket.emit("getProducers", (producerIds) => {
-      console.log(producerIds);
-      producerIds.forEach(signalNewConsumerTransport);
+      producerIds.forEach(({id,userId}) => {
+        signalNewConsumerTransport(id, userId)
+      });
     });
   };
 
   const connectRecvTransport = async (
     consumerTransport,
     remoteProducerId,
-    serverConsumerTransportId
+    serverConsumerTransportId,
+    remoteProducerUserId
   ) => {
     try {
       await socket.emit(
@@ -149,14 +158,6 @@ const TutorProctoring = () => {
             rtpParameters: params.rtpParameters,
           });
 
-          console.log("tetsttttt", {
-            consumerId: params.id,
-            producerId: params.producerId,
-            kind: params.kind,
-            rtpParameters: params.rtpParameters,
-            serverConsumerId: params.id,
-          });
-
           consumerTransports = [
             ...consumerTransports,
             {
@@ -170,7 +171,6 @@ const TutorProctoring = () => {
           // Create a new div element for the new consumer media
           const newElem = document.createElement("div");
           newElem.setAttribute("id", `td-${remoteProducerId}`);
-          console.log(params.kind, "remoteProducerId ", remoteProducerId);
 
           if (params.kind === "audio") {
             newElem.innerHTML =
@@ -186,6 +186,8 @@ const TutorProctoring = () => {
               remoteProducerId +
               '" autoplay class="video"></video> <p> video"' +
               remoteProducerId +
+              '" userId="' +
+              remoteProducerUserId +
               '"</>';
           }
 
@@ -228,12 +230,12 @@ const TutorProctoring = () => {
     }
   };
 
-  const resumeProducerStream = (producerId) => {
-    if (!producerId) {
-      console.log("please provide producer id");
+  const resumeProducerStream = (userId) => {
+    if (!userId) {
+      console.log("please provide userId id");
       return;
     }
-    socket.emit("resumeProducerStream", { producerId }, (response) => {
+    socket.emit("resumeProducerStream", { userId, kind: isChecked === true ? "video": "audio" }, (response) => {
       if (response.success) {
         console.log("Producer stream resumed");
         // Handle video playback, etc.
@@ -243,13 +245,16 @@ const TutorProctoring = () => {
     });
   };
 
-  const pauseProducerStream = (producerId) => {
-    if (!producerId) {
-      console.log("please provide producer id");
+  const pauseProducerStream = (userId) => {
+    if (!userId) {
+      console.log("please provide userId id");
       return;
     }
 
-    socket.emit("pauseProducerStream", { producerId }, (response) => {
+    console.log(isChecked, "dsdsdwd ", isChecked === true ? "video": "audio" );
+    
+
+    socket.emit("pauseProducerStream", { userId , kind: isChecked === true ? "video": "audio" }, (response) => {
       if (response.success) {
         console.log("Producer stream paused");
         // Update UI accordingly
@@ -259,15 +264,33 @@ const TutorProctoring = () => {
     });
   };
 
+  const [isChecked, setIsChecked] = useState(false);
+
+  const handleToggle = () => {
+    setIsChecked(!isChecked);
+  };
+
   return (
     <div>
       <h1>Tutor Proctoring</h1>
       <input
         type="text"
-        placeholder="Enter producer ID"
+        placeholder="Enter user ID"
         value={streamProducerId}
         onChange={(e) => setStreamProducerId(e.target.value)}
       />
+      
+      <label className="switch">
+    <span className="label">{"audio"}</span>
+      <input
+        type="checkbox"
+        checked={isChecked}
+        onChange={handleToggle}
+      />
+      <span className="slider" />
+      <span className="label">{"video"}</span>
+    </label>
+
       <button onClick={() => resumeProducerStream(streamProducerId)}>
         Resume Stream
       </button>
