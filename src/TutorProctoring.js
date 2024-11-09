@@ -176,19 +176,17 @@ const TutorProctoring = () => {
             newElem.innerHTML =
               '<audio id="' +
               remoteProducerId +
-              '" autoplay></audio> <p> audio"' +
-              remoteProducerId +
+              '" autoplay></audio> <p> audio userId"' +
+              remoteProducerUserId +
               '"</>';
           } else {
             newElem.setAttribute("class", "remoteVideo");
             newElem.innerHTML =
               '<video id="' +
               remoteProducerId +
-              '" autoplay class="video"></video> <p> video"' +
-              remoteProducerId +
-              '" userId="' +
+              '" autoplay class="video"></video> <p> video userId="' +
               remoteProducerUserId +
-              '"</>';
+              '"</p>';
           }
 
           videoContainerRef.current.appendChild(newElem);
