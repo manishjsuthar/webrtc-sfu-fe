@@ -8,7 +8,12 @@ const StudentProctoring = () => {
   const localVideoRef = useRef(null);
   const { roomName } = useParams();
   const [username, setusername] = useState("");
+  const [isRecordingStarted, setisRecordingStarted] = useState(false);
   let device;
+  const mediaRecordedChunks = [];
+  const screenRecordedChunks = [];
+  const mediaRecorder = useRef(null);
+  const screenRecorder = useRef(null);
 
   const getVideoParams = () => ({
     encodings: [
@@ -46,6 +51,151 @@ const StudentProctoring = () => {
       .catch((error) => console.error("Error accessing media devices.", error));
   };
 
+  const startRecording = () => {
+    if (localVideoRef.current && localVideoRef.current.srcObject) {
+      setisRecordingStarted(true);
+      const mediaStream = localVideoRef.current.srcObject;
+
+      try {
+        const media = new MediaRecorder(mediaStream, {
+          mimeType: "video/webm; codecs=vp9",
+        });
+
+        mediaRecorder.current = media;
+
+        mediaRecorder.current.ondataavailable = (event) => {
+          if (event.data && event.data.size > 0) {
+            mediaRecordedChunks.push(event.data);
+          }
+        };
+
+        mediaRecorder.current.onstop = () => {
+          // const blob = new Blob(mediaRecordedChunks, { type: "video/webm" });
+          // const url = URL.createObjectURL(blob);
+          // // Save the URL or handle it as needed
+          // console.log("Recording stopped, blob URL: ", url);
+          downloadVideo("user");
+        };
+
+        // Start recording
+        mediaRecorder.current.start();
+      } catch (error) {
+        console.error("Error starting MediaRecorder:", error);
+      }
+    } else {
+      console.error("No media stream available for recording.");
+    }
+  };
+
+  const stopRecording = () => {
+    if (mediaRecorder.current && mediaRecorder.current.state === "recording") {
+      stopScreenRecording();
+      mediaRecorder.current.stop();
+      setisRecordingStarted(false);
+
+      const fullBlob = new Blob(mediaRecordedChunks, { type: "video/webm" });
+      uploadFile(fullBlob);
+    } else {
+      console.error("MediaRecorder is not active or not initialized.");
+    }
+  };
+
+  // async function uploadChunkToS3(blob) {
+  //   const params = {
+  //     Bucket: "your-s3-bucket-name",
+  //     Key: `videos/recording-${Date.now()}.webm`,
+  //     Body: blob,
+  //     ContentType: "video/webm",
+  //   };
+
+  //   try {
+  //     await s3.upload(params).promise();
+  //     console.log("Chunk uploaded successfully");
+  //   } catch (error) {
+  //     console.error("Error uploading chunk:", error);
+  //   }
+  // }
+
+  const uploadFile = async (blob) => {
+    const formData = new FormData();
+    formData.append('file', blob, 'video_record.webm');
+
+    //add user Data also
+  
+    await fetch('http://localhost:3000/file/uploadRecording', {
+      method: 'POST',
+      body: formData,
+    });
+  };
+
+  function downloadVideo(recordType) {
+    const blob = new Blob(
+      recordType === "screen" ? screenRecordedChunks : mediaRecordedChunks,
+      { type: "video/webm" }
+    );
+    const url = URL.createObjectURL(blob);
+
+    const downloadLink = document.createElement("a");
+    downloadLink.href = url;
+    downloadLink.download = `${
+      recordType === "screen" && "screen-"
+    }recording-${Date.now()}.webm`;
+    downloadLink.textContent = "Download video";
+
+    document.body.appendChild(downloadLink);
+    downloadLink.click();
+
+    setTimeout(() => {
+      URL.revokeObjectURL(url);
+      document.body.removeChild(downloadLink);
+    }, 100);
+  }
+
+  async function startScreenRecording() {
+    try {
+      const screenStream = await navigator.mediaDevices.getDisplayMedia({
+        video: true,
+      });
+      const media = new MediaRecorder(screenStream, {
+        mimeType: "video/webm; codecs=vp9",
+      });
+
+      screenRecorder.current = media;
+
+      screenRecorder.current.ondataavailable = (event) => {
+        if (event.data && event.data.size > 0) {
+          screenRecordedChunks.push(event.data);
+        }
+      };
+
+      screenRecorder.current.onstop = () => {
+        // const blob = new Blob(screenRecordedChunks, { type: "video/webm" });
+        // const url = URL.createObjectURL(blob);
+        // // Save the URL or handle it as needed
+        // console.log("Recording stopped, blob URL: ", url);
+        downloadVideo("screen");
+      };
+
+      // Start recording
+      screenRecorder.current.start();
+    } catch (error) {
+      console.error("Error starting Screen MediaRecorder:", error);
+    }
+  }
+
+  const stopScreenRecording = () => {
+    if (
+      screenRecorder.current &&
+      screenRecorder.current.state === "recording"
+    ) {
+      screenRecorder.current.stop();
+
+      console.log("Screen Recording stopped");
+    } else {
+      console.error("Screen MediaRecorder is not active or not initialized.");
+    }
+  };
+
   const streamSuccess = (stream, userId) => {
     if (localVideoRef.current) {
       localVideoRef.current.srcObject = stream;
@@ -66,6 +216,8 @@ const StudentProctoring = () => {
       (data) => {
         console.log(`Router RTP Capabilities... ${data.rtpCapabilities}`);
         createDevice(data.rtpCapabilities, audioParams, videoParams);
+        startRecording();
+        startScreenRecording();
       }
     );
   };
@@ -154,21 +306,27 @@ const StudentProctoring = () => {
   return (
     <div>
       <h1>Student Proctoring</h1>
-      <input
-        type="text"
-        placeholder="Enter User ID"
-        value={username}
-        onChange={(e) => setusername(e.target.value)}
-      />
-      <button
-        onClick={() => {
-          username.length
-            ? getLocalStream(username)
-            : alert("Userid is required");
-        }}
-      >
-        Join Room
-      </button>
+      {!isRecordingStarted ? (
+        <>
+          <input
+            type="text"
+            placeholder="Enter User ID"
+            value={username}
+            onChange={(e) => setusername(e.target.value)}
+          />
+          <button
+            onClick={() => {
+              username.length
+                ? getLocalStream(username)
+                : alert("Userid is required");
+            }}
+          >
+            Join Room
+          </button>
+        </>
+      ) : (
+        <button onClick={() => stopRecording()}>Stop recording</button>
+      )}
       <video ref={localVideoRef} id="local-video" autoPlay muted />
     </div>
   );
