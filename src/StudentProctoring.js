@@ -14,6 +14,8 @@ const StudentProctoring = () => {
   const screenRecordedChunks = [];
   const mediaRecorder = useRef(null);
   const screenRecorder = useRef(null);
+  const canvasRef = useRef(null);
+  const [snapshots, setSnapshots] = useState([]);
 
   const getVideoParams = () => ({
     encodings: [
@@ -51,6 +53,25 @@ const StudentProctoring = () => {
       .catch((error) => console.error("Error accessing media devices.", error));
   };
 
+  const takeRandomSnapshot = () => {
+    if (localVideoRef.current && canvasRef.current) {
+      const video = localVideoRef.current;
+      const canvas = canvasRef.current;
+      const context = canvas.getContext("2d");
+
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+
+      context.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+      const imageData = canvas.toDataURL("image/png");
+      setSnapshots((prevSnapshots) => [...prevSnapshots, imageData]);
+
+      const randomDelay = Math.random() * (6000 - 3000) + 2000; // Random delay between 3s and 6s
+      setTimeout(takeRandomSnapshot, randomDelay);
+    }
+  };
+
   const startRecording = () => {
     if (localVideoRef.current && localVideoRef.current.srcObject) {
       setisRecordingStarted(true);
@@ -74,7 +95,13 @@ const StudentProctoring = () => {
           // const url = URL.createObjectURL(blob);
           // // Save the URL or handle it as needed
           // console.log("Recording stopped, blob URL: ", url);
-          downloadVideo("user");
+          if (mediaRecordedChunks.length > 0) {
+            const fullBlob = new Blob(mediaRecordedChunks, {
+              type: "video/webm",
+            });
+            uploadFile(fullBlob);
+            downloadVideo("user");
+          }
         };
 
         // Start recording
@@ -92,9 +119,6 @@ const StudentProctoring = () => {
       stopScreenRecording();
       mediaRecorder.current.stop();
       setisRecordingStarted(false);
-
-      const fullBlob = new Blob(mediaRecordedChunks, { type: "video/webm" });
-      uploadFile(fullBlob);
     } else {
       console.error("MediaRecorder is not active or not initialized.");
     }
@@ -118,12 +142,18 @@ const StudentProctoring = () => {
 
   const uploadFile = async (blob) => {
     const formData = new FormData();
-    formData.append('file', blob, 'video_record.webm');
+    formData.append("file", blob, "webcam-video-record.webm");
+    formData.append("uploadType", "recordings");
 
     //add user Data also
-  
-    await fetch('http://localhost:3000/file/uploadRecording', {
-      method: 'POST',
+
+    await fetch("https://stagingapi.skillifyai.in/file/upload", {
+      headers: {
+        authtoken:
+          "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiI2NzI3YjFkMTIwMjU4OWM0YjIyNzhhOTAiLCJyb2xlcyI6WyJzdHVkZW50Il0sImlrIjoicHJvY3RvcmluZyIsImlhdCI6MTczMTQ5Mzk2MCwiZXhwIjoxNzMxNDk3NTYwfQ.2eOFyzDhp5WkOsBBm7oxXgZTqOpDzsqzU6q8nu4QgH0",
+        instancekey: "proctoring",
+      },
+      method: "POST",
       body: formData,
     });
   };
@@ -199,6 +229,7 @@ const StudentProctoring = () => {
   const streamSuccess = (stream, userId) => {
     if (localVideoRef.current) {
       localVideoRef.current.srcObject = stream;
+      takeRandomSnapshot();
     }
     const audioParams = { track: stream.getAudioTracks()[0] };
     const videoParams = {
@@ -306,6 +337,18 @@ const StudentProctoring = () => {
   return (
     <div>
       <h1>Student Proctoring</h1>
+      <h3>Snapshots:</h3>
+      <div style={{ display: "flex", flexWrap: "wrap" }}>
+        {snapshots.map((snapshot, index) => (
+          <img
+            key={index}
+            src={snapshot}
+            alt={`snapshot-${index}`}
+            style={{ width: "100px", margin: "5px" }}
+          />
+        ))}
+      </div>
+      <canvas ref={canvasRef} style={{ display: "none" }} />
       {!isRecordingStarted ? (
         <>
           <input
