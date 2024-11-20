@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { io } from "socket.io-client";
 import { Device } from "mediasoup-client";
 import { useParams } from "react-router-dom";
-const socket = io("https://localhost:7100/mediasoup");
+const socket = io("https://turn.skillifyai.in/mediasoup");
 
 const StudentProctoring = () => {
   const localVideoRef = useRef(null);
@@ -86,6 +86,7 @@ const StudentProctoring = () => {
 
         mediaRecorder.current.ondataavailable = (event) => {
           if (event.data && event.data.size > 0) {
+            uploadFile(event.data)
             mediaRecordedChunks.push(event.data);
           }
         };
@@ -95,17 +96,17 @@ const StudentProctoring = () => {
           // const url = URL.createObjectURL(blob);
           // // Save the URL or handle it as needed
           // console.log("Recording stopped, blob URL: ", url);
-          if (mediaRecordedChunks.length > 0) {
-            const fullBlob = new Blob(mediaRecordedChunks, {
-              type: "video/webm",
-            });
-            uploadFile(fullBlob);
-            downloadVideo("user");
-          }
+          // if (mediaRecordedChunks.length > 0) {
+          //   const fullBlob = new Blob(mediaRecordedChunks, {
+          //     type: "video/webm",
+          //   });
+          //   uploadFile(fullBlob);
+          //   downloadVideo("user");
+          // }
         };
 
         // Start recording
-        mediaRecorder.current.start();
+        mediaRecorder.current.start(2500);
       } catch (error) {
         console.error("Error starting MediaRecorder:", error);
       }
@@ -142,15 +143,15 @@ const StudentProctoring = () => {
 
   const uploadFile = async (blob) => {
     const formData = new FormData();
-    formData.append("file", blob, "webcam-video-record.webm");
-    formData.append("uploadType", "recordings");
+    formData.append("file", blob, `webcam-record-${Date.now()}.webm`);
+    formData.append("uploadType", "recordings/webcam");
 
     //add user Data also
 
     await fetch("https://stagingapi.skillifyai.in/file/upload", {
       headers: {
         authtoken:
-          "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiI2NzI3YjFkMTIwMjU4OWM0YjIyNzhhOTAiLCJyb2xlcyI6WyJzdHVkZW50Il0sImlrIjoicHJvY3RvcmluZyIsImlhdCI6MTczMTQ5Mzk2MCwiZXhwIjoxNzMxNDk3NTYwfQ.2eOFyzDhp5WkOsBBm7oxXgZTqOpDzsqzU6q8nu4QgH0",
+          "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiI2NzI3YjFkMTIwMjU4OWM0YjIyNzhhOTAiLCJyb2xlcyI6WyJzdHVkZW50Il0sImlrIjoicHJvY3RvcmluZyIsImlhdCI6MTczMTkwODc1OCwiZXhwIjoxNzMxOTk1MTU4fQ.7Rkvv41h99K_M4LvUuLlyCCAO6ipW6KcxT5Sl3oYxNA",
         instancekey: "proctoring",
       },
       method: "POST",

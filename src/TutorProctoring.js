@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { io } from "socket.io-client";
 import { Device } from "mediasoup-client";
 import { useParams } from "react-router-dom";
-const socket = io("https://localhost:7100/mediasoup");
+const socket = io("https://turn.skillifyai.in/mediasoup");
 
 const TutorProctoring = () => {
   const videoContainerRef = useRef(null);
