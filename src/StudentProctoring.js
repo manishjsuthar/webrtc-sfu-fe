@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { io } from "socket.io-client";
 import { Device } from "mediasoup-client";
 import { useParams } from "react-router-dom";
-const socket = io("https://turn.skillifyai.in/mediasoup");
+const socket = io("http://localhost:7100/mediasoup");
 
 const StudentProctoring = () => {
   const localVideoRef = useRef(null);
@@ -86,23 +86,12 @@ const StudentProctoring = () => {
 
         mediaRecorder.current.ondataavailable = (event) => {
           if (event.data && event.data.size > 0) {
-            uploadFile(event.data)
+            // uploadFile(event.data)
             mediaRecordedChunks.push(event.data);
           }
         };
 
         mediaRecorder.current.onstop = () => {
-          // const blob = new Blob(mediaRecordedChunks, { type: "video/webm" });
-          // const url = URL.createObjectURL(blob);
-          // // Save the URL or handle it as needed
-          // console.log("Recording stopped, blob URL: ", url);
-          // if (mediaRecordedChunks.length > 0) {
-          //   const fullBlob = new Blob(mediaRecordedChunks, {
-          //     type: "video/webm",
-          //   });
-          //   uploadFile(fullBlob);
-          //   downloadVideo("user");
-          // }
         };
 
         // Start recording
@@ -114,32 +103,6 @@ const StudentProctoring = () => {
       console.error("No media stream available for recording.");
     }
   };
-
-  const stopRecording = () => {
-    if (mediaRecorder.current && mediaRecorder.current.state === "recording") {
-      stopScreenRecording();
-      mediaRecorder.current.stop();
-      setisRecordingStarted(false);
-    } else {
-      console.error("MediaRecorder is not active or not initialized.");
-    }
-  };
-
-  // async function uploadChunkToS3(blob) {
-  //   const params = {
-  //     Bucket: "your-s3-bucket-name",
-  //     Key: `videos/recording-${Date.now()}.webm`,
-  //     Body: blob,
-  //     ContentType: "video/webm",
-  //   };
-
-  //   try {
-  //     await s3.upload(params).promise();
-  //     console.log("Chunk uploaded successfully");
-  //   } catch (error) {
-  //     console.error("Error uploading chunk:", error);
-  //   }
-  // }
 
   const uploadFile = async (blob) => {
     const formData = new FormData();
@@ -159,6 +122,16 @@ const StudentProctoring = () => {
     });
   };
 
+  const stopRecording = () => {
+    if (mediaRecorder.current && mediaRecorder.current.state === "recording") {
+      stopScreenRecording();
+      mediaRecorder.current.stop();
+      setisRecordingStarted(false);
+    } else {
+      console.error("MediaRecorder is not active or not initialized.");
+    }
+  };
+  
   function downloadVideo(recordType) {
     const blob = new Blob(
       recordType === "screen" ? screenRecordedChunks : mediaRecordedChunks,
@@ -338,7 +311,7 @@ const StudentProctoring = () => {
   return (
     <div>
       <h1>Student Proctoring</h1>
-      <h3>Snapshots:</h3>
+      {/* <h3>Snapshots:</h3>
       <div style={{ display: "flex", flexWrap: "wrap" }}>
         {snapshots.map((snapshot, index) => (
           <img
@@ -349,7 +322,7 @@ const StudentProctoring = () => {
           />
         ))}
       </div>
-      <canvas ref={canvasRef} style={{ display: "none" }} />
+      <canvas ref={canvasRef} style={{ display: "none" }} /> */}
       {!isRecordingStarted ? (
         <>
           <input
